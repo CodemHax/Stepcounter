@@ -3,7 +3,7 @@
 ![Android](https://img.shields.io/badge/Platform-Android-brightgreen.svg)
 ![Kotlin](https://img.shields.io/badge/Language-Kotlin-orange.svg)
 
-> A rebranded step counter app that now includes health metrics tracking, using your device's built-in step counter sensor to track your daily steps and more.
+> A new step counter app that now includes health metrics tracking, using your device's built-in step counter sensor to track your daily steps and more.
 
 ## Features
 
