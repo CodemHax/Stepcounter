@@ -10,20 +10,13 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Button
-import androidx.compose.material3.Text
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
@@ -31,12 +24,11 @@ import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
 import com.my.counter.ui.theme.CounterTheme
 
-
 class MainActivity : ComponentActivity(), SensorEventListener {
-    private val sensorManager: SensorManager by lazy{
+    private val sensorManager: SensorManager by lazy {
         getSystemService(Context.SENSOR_SERVICE) as SensorManager
     }
-    private var sensor : Sensor? = null
+    private var sensor: Sensor? = null
     private var counter by mutableIntStateOf(0)
     private var isCounting by mutableStateOf(false)
     private var initialSteps: Int? = null
@@ -48,61 +40,99 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         enableEdgeToEdge()
         sensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
 
-
         val sharedPref = getPreferences(Context.MODE_PRIVATE)
         counter = sharedPref.getInt("counter", 0)
         totalSteps = sharedPref.getInt("totalSteps", 0)
+        isCounting = sharedPref.getBoolean("isCounting", false)
 
         if (sensor == null) {
             Toast.makeText(this, "Step counter sensor not available", Toast.LENGTH_LONG).show()
         }
+
+        if (isCounting) {
+            startCounter()
+        }
+
         setContent {
             CounterTheme {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
                 ) {
-                    val permission = rememberPermissionState(permission = android.Manifest.permission.ACTIVITY_RECOGNITION)
-                    Spacer(modifier = Modifier
-                        .padding(top= 300.dp))
-                    Text(
-                        text = counter.toString(),
-                        modifier = Modifier,
-                        fontSize = 100.sp
-                    )
-
-                    Button(onClick = {
-                        if (permission.status.isGranted) {
-                            if (!isCounting && sensor != null) {
-                                startCounter()
-                            } else if (isCounting) {
-                                stopCounter()
-                            } else {
-                                Toast.makeText(applicationContext, "Step counter sensor not available", Toast.LENGTH_SHORT).show()
-                            }
-                            if (sensor != null) {
-                                isCounting = !isCounting
-                            }
-                        } else {
-                            permission.launchPermissionRequest()
-                        }
-                    },
-                        modifier = Modifier.width(109.dp)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text(text = if (isCounting) "Stop" else "Start")
-                    }
-
-                    Button(onClick = {
-                        counter = 0
-                        totalSteps = 0
-                        saveCounterState()
-                    },
-                        modifier = Modifier.width(109.dp)
-                    ) {
-                        Text(
-                            text = "Reset"
+                        val permission = rememberPermissionState(
+                            permission = android.Manifest.permission.ACTIVITY_RECOGNITION
                         )
+
+                        Text(
+                            text = "Steps",
+                            fontSize = 24.sp,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        Text(
+                            text = counter.toString(),
+                            fontSize = 96.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(vertical = 32.dp)
+                        )
+
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            modifier = Modifier.padding(top = 16.dp)
+                        ) {
+                            Button(
+                                onClick = {
+                                    if (permission.status.isGranted) {
+                                        if (!isCounting && sensor != null) {
+                                            startCounter()
+                                        } else if (isCounting) {
+                                            stopCounter()
+                                        } else {
+                                            Toast.makeText(applicationContext, "Step counter sensor not available", Toast.LENGTH_SHORT).show()
+                                        }
+                                        if (sensor != null) {
+                                            isCounting = !isCounting
+                                            saveCounterState()
+                                        }
+                                    } else {
+                                        permission.launchPermissionRequest()
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (isCounting) Color.Red else MaterialTheme.colorScheme.primary,
+                                    contentColor = Color.White
+                                ),
+                                modifier = Modifier.width(120.dp)
+                            ) {
+                                Text(
+                                    text = if (isCounting) "Stop" else "Start",
+                                    fontSize = 16.sp
+                                )
+                            }
+
+                            Button(
+                                onClick = {
+                                    counter = 0
+                                    totalSteps = 0
+                                    initialSteps = null
+                                    saveCounterState()
+                                },
+                                modifier = Modifier.width(120.dp)
+                            ) {
+                                Text(
+                                    text = "Reset",
+                                    fontSize = 16.sp
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -112,7 +142,12 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     private fun startCounter() {
         sensor?.let { stepSensor ->
             try {
-                initialSteps = null
+                val wasReset = getPreferences(Context.MODE_PRIVATE).getBoolean("wasReset", false)
+                if (wasReset) {
+                    initialSteps = null
+                    totalSteps = 0
+                    counter = 0
+                }
                 sensorManager.registerListener(this, stepSensor, SensorManager.SENSOR_DELAY_FASTEST)
             } catch (e: SecurityException) {
                 Toast.makeText(this, "Permission required", Toast.LENGTH_SHORT).show()
@@ -135,6 +170,8 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         with(sharedPref.edit()) {
             putInt("counter", counter)
             putInt("totalSteps", totalSteps)
+            putBoolean("wasReset", counter == 0)
+            putBoolean("isCounting", isCounting)
             apply()
         }
     }
@@ -165,6 +202,5 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         }
     }
 
-    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
-    }
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
 }
