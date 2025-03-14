@@ -1,6 +1,8 @@
 package com.my.counter
 
+import android.annotation.SuppressLint
 import android.content.Context
+import android.content.pm.ActivityInfo
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -12,33 +14,19 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.annotation.RequiresApi
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.ui.text.input.KeyboardType
-import com.google.accompanist.permissions.ExperimentalPermissionsApi
-import com.google.accompanist.permissions.isGranted
-import com.google.accompanist.permissions.rememberPermissionState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.lifecycle.lifecycleScope
+import com.my.counter.ui.CounterScreen
 import com.my.counter.ui.theme.CounterTheme
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import kotlinx.coroutines.*
-import androidx.lifecycle.lifecycleScope
-import kotlin.math.roundToInt
 
 class MainActivity : ComponentActivity(), SensorEventListener {
     private val sensorManager: SensorManager by lazy {
@@ -56,15 +44,15 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     private var consecutiveZeros = 0
     @RequiresApi(Build.VERSION_CODES.O)
     private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
-
     private var userWeight by mutableFloatStateOf(70.0f)
     private var stepLength by mutableFloatStateOf(0.7f)
     private var caloriesBurned by mutableFloatStateOf(0f)
 
+    @SuppressLint("SourceLockedOrientationActivity")
     @RequiresApi(Build.VERSION_CODES.O)
-    @OptIn(ExperimentalPermissionsApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         enableEdgeToEdge()
         sensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
 
@@ -76,298 +64,74 @@ class MainActivity : ComponentActivity(), SensorEventListener {
 
         setContent {
             CounterTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    var showGoalDialog by remember { mutableStateOf(false) }
-                    var showSettingsDialog by remember { mutableStateOf(false) }
-                    var goalInputValue by remember { mutableStateOf(dailyGoal.toString()) }
-                    var weightInputValue by remember { mutableStateOf(userWeight.toString()) }
-                    var stepLengthInputValue by remember { mutableStateOf(stepLength.toString()) }
-
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(16.dp),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                            rememberPermissionState(
-                                permission = android.Manifest.permission.ACTIVITY_RECOGNITION
-                            )
-                        } else {
-                            TODO("VERSION.SDK_INT < Q")
-                        }
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.End
-                        ) {
-                            IconButton(onClick = { showSettingsDialog = true }) {
-                                Icon(
-                                    imageVector = Icons.Default.Settings,
-                                    contentDescription = "Settings"
-                                )
-                            }
-                        }
-
-                        Text(
-                            text = "Steps",
-                            fontSize = 24.sp,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold
-                        )
-
-                        Text(
-                            text = counter.toString(),
-                            fontSize = 96.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(vertical = 16.dp)
-                        )
-
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceEvenly
-                        ) {
-                            Card(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .padding(4.dp)
-                                    .height(80.dp),
-                                elevation = CardDefaults.cardElevation(4.dp)
-                            ) {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .padding(8.dp),
-                                    verticalArrangement = Arrangement.Center,
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Text(
-                                        text = "CALORIES",
-                                        fontSize = 12.sp,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                    Text(
-                                        text = "${caloriesBurned.roundToInt()}",
-                                        fontSize = 24.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-
-                            Card(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .padding(4.dp)
-                                    .height(80.dp),
-                                elevation = CardDefaults.cardElevation(4.dp)
-                            ) {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .padding(8.dp),
-                                    verticalArrangement = Arrangement.Center,
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Text(
-                                        text = "DISTANCE",
-                                        fontSize = 12.sp,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                    val distanceKm = (counter * stepLength / 1000f)
-                                    Text(
-                                        text = "%.2f km".format(distanceKm),
-                                        fontSize = 24.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                        }
-
-                        val progress = (counter.toFloat() / dailyGoal).coerceIn(0f, 1f)
-                        Text(
-                            text = "Daily Goal: $counter / $dailyGoal",
-                            fontSize = 16.sp,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
-
-                        LinearProgressIndicator(
-                            progress = { progress },
-                            modifier = Modifier
-                                .padding(vertical = 8.dp)
-                                .fillMaxWidth()
-                                .height(12.dp),
-                            color = when {
-                                progress >= 1f -> Color.Green
-                                progress >= 0.7f -> Color(0xFF8BC34A)
-                                else -> MaterialTheme.colorScheme.primary
-                            },
-                            trackColor = MaterialTheme.colorScheme.surfaceVariant
-                        )
-
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(16.dp),
-                            modifier = Modifier.padding(top = 16.dp)
-                        ) {
-                            Button(
-                                onClick = {
-                                    if (permission.status.isGranted) {
-                                        if (!isCounting && sensor != null) {
-                                            startCounter()
-                                        } else if (isCounting) {
-                                            stopCounter()
-                                        } else {
-                                            Toast.makeText(applicationContext, "Step counter sensor not available", Toast.LENGTH_SHORT).show()
-                                        }
-                                        if (sensor != null) {
-                                            isCounting = !isCounting
-                                            saveCounterState()
-                                        }
-                                    } else {
-                                        permission.launchPermissionRequest()
-                                    }
-                                },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (isCounting) Color.Red else MaterialTheme.colorScheme.primary,
-                                    contentColor = Color.White
-                                ),
-                                modifier = Modifier.width(120.dp)
-                            ) {
-                                Text(
-                                    text = if (isCounting) "Stop" else "Start",
-                                    fontSize = 16.sp
-                                )
-                            }
-
-                            Button(
-                                onClick = {
-                                    counter = 0
-                                    totalSteps = 0
-                                    initialSteps = null
-                                    caloriesBurned = 0f
-                                    saveCounterState()
-                                },
-                                modifier = Modifier.width(120.dp)
-                            ) {
-                                Text(
-                                    text = "Reset",
-                                    fontSize = 16.sp
-                                )
-                            }
-                        }
-
-                        Button(
-                            onClick = { showGoalDialog = true },
-                            modifier = Modifier
-                                .padding(top = 16.dp)
-                                .width(200.dp)
-                        ) {
-                            Text("Set Daily Goal")
-                        }
-
-                        if (showGoalDialog) {
-                            AlertDialog(
-                                onDismissRequest = { showGoalDialog = false },
-                                title = { Text("Set Daily Goal") },
-                                text = {
-                                    OutlinedTextField(
-                                        value = goalInputValue,
-                                        onValueChange = { goalInputValue = it },
-                                        label = { Text("Steps") },
-                                        keyboardOptions = KeyboardOptions(
-                                            keyboardType = KeyboardType.Number
-                                        )
-                                    )
-                                },
-                                confirmButton = {
-                                    Button(
-                                        onClick = {
-                                            goalInputValue.toIntOrNull()?.let { newGoal ->
-                                                if (newGoal > 0) {
-                                                    dailyGoal = newGoal
-                                                    saveCounterState()
-                                                    showGoalDialog = false
-                                                } else {
-                                                    Toast.makeText(applicationContext, "Please enter a valid goal", Toast.LENGTH_SHORT).show()
-                                                }
-                                            } ?: run {
-                                                Toast.makeText(applicationContext, "Please enter a valid number", Toast.LENGTH_SHORT).show()
-                                            }
-                                        }
-                                    ) {
-                                        Text("Save")
-                                    }
-                                },
-                                dismissButton = {
-                                    Button(onClick = { showGoalDialog = false }) {
-                                        Text("Cancel")
-                                    }
-                                }
-                            )
-                        }
-
-                        if (showSettingsDialog) {
-                            AlertDialog(
-                                onDismissRequest = { showSettingsDialog = false },
-                                title = { Text("Settings") },
-                                text = {
-                                    Column(
-                                        modifier = Modifier.padding(8.dp),
-                                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                                    ) {
-                                        Text("Personal Information", fontWeight = FontWeight.Bold)
-
-                                        OutlinedTextField(
-                                            value = weightInputValue,
-                                            onValueChange = { weightInputValue = it },
-                                            label = { Text("Weight (kg)") },
-                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
-                                        )
-
-                                        OutlinedTextField(
-                                            value = stepLengthInputValue,
-                                            onValueChange = { stepLengthInputValue = it },
-                                            label = { Text("Step Length (meters)") },
-                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
-                                        )
-                                    }
-                                },
-                                confirmButton = {
-                                    Button(
-                                        onClick = {
-                                            val newWeight = weightInputValue.toFloatOrNull()
-                                            val newStepLength = stepLengthInputValue.toFloatOrNull()
-
-                                            if (newWeight != null && newWeight > 0 &&
-                                                newStepLength != null && newStepLength > 0) {
-                                                userWeight = newWeight
-                                                stepLength = newStepLength
-                                                calculateCalories()
-                                                saveCounterState()
-                                                showSettingsDialog = false
-                                            } else {
-                                                Toast.makeText(applicationContext, "Please enter valid values", Toast.LENGTH_SHORT).show()
-                                            }
-                                        }
-                                    ) {
-                                        Text("Save")
-                                    }
-                                },
-                                dismissButton = {
-                                    Button(onClick = { showSettingsDialog = false }) {
-                                        Text("Cancel")
-                                    }
-                                }
-                            )
-                        }
-                    }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    CounterScreen(
+                        counter = counter,
+                        isCounting = isCounting,
+                        dailyGoal = dailyGoal,
+                        caloriesBurned = caloriesBurned,
+                        stepLength = stepLength,
+                        userWeight = userWeight,
+                        onStartStopClick = { handleStartStop() },
+                        onResetClick = { resetCounter() },
+                        onDailyGoalChanged = { newGoal -> updateDailyGoal(newGoal) },
+                        onUserWeightChanged = { newWeight -> updateUserWeight(newWeight) },
+                        onStepLengthChanged = { newStepLength -> updateStepLength(newStepLength) }
+                    )
                 }
             }
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    private fun handleStartStop() {
+        if (!isCounting && sensor != null) {
+            startCounter()
+        } else if (isCounting) {
+            stopCounter()
+        } else {
+            Toast.makeText(applicationContext, "Step counter sensor not available", Toast.LENGTH_SHORT).show()
+        }
+        if (sensor != null) {
+            isCounting = !isCounting
+            saveCounterState()
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    private fun resetCounter() {
+        counter = 0
+        totalSteps = 0
+        initialSteps = null
+        caloriesBurned = 0f
+        saveCounterState()
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    private fun updateDailyGoal(newGoal: Int) {
+        if (newGoal > 0) {
+            dailyGoal = newGoal
+            saveCounterState()
+        } else {
+            Toast.makeText(applicationContext, "Please enter a valid goal", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    private fun updateUserWeight(newWeight: Float) {
+        if (newWeight > 0) {
+            userWeight = newWeight
+            calculateCalories()
+            saveCounterState()
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    private fun updateStepLength(newStepLength: Float) {
+        if (newStepLength > 0) {
+            stepLength = newStepLength
+            calculateCalories()
+            saveCounterState()
         }
     }
 
@@ -455,6 +219,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.O)
     private fun stopCounter() {
         sensorManager.unregisterListener(this)
         saveCounterState()
@@ -493,6 +258,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         saveCounterState()
     }
 
+    @RequiresApi(Build.VERSION_CODES.O)
     override fun onDestroy() {
         super.onDestroy()
         stopCounter()
@@ -504,7 +270,9 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                 val currentSteps = event.values[0].toInt()
 
                 if (initialSteps == null) {
-                    initialSteps = currentSteps - totalSteps
+                    initialSteps = currentSteps
+                    counter = 0
+                    totalSteps = 0
                 }
 
                 if (currentSteps < lastStepCount) {
@@ -512,12 +280,17 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                     counter = 0
                     totalSteps = 0
                     caloriesBurned = 0f
-                } else if (currentSteps - lastStepCount > 50) {
                 } else {
-                    counter = currentSteps - (initialSteps ?: 0)
-                    totalSteps = counter
-                    calculateCalories()
+
+                    val stepDelta = currentSteps - lastStepCount
+
+                    if (stepDelta <= 50) {
+                        counter = currentSteps - (initialSteps ?: 0)
+                        totalSteps = counter
+                        calculateCalories()
+                    }
                 }
+                lastStepCount = currentSteps
 
                 if (currentSteps == 0) {
                     consecutiveZeros++
@@ -527,8 +300,6 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                 } else {
                     consecutiveZeros = 0
                 }
-
-                lastStepCount = currentSteps
             }
         }
     }
